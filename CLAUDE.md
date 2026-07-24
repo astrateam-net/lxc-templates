@@ -14,6 +14,12 @@ a release asset. See [README.md](README.md) for the why and the build.
   packages at build-time shrinks the Coder `coder_agent` startup to workspace glue.
 - **Public package installs only.** No secrets in definitions; workspace-specific
   sensitive config stays in the Coder template / 1Password, never baked in.
+- **CI installs distrobuilder via snap — there is no prebuilt binary or official
+  action.** `template-builder.yaml` runs `sudo distrobuilder build-lxc` as root
+  (`debootstrap` is the host backend for Debian/Ubuntu bases). No `docker bake`
+  here — unlike `appimages`, nothing builds in a Docker sandbox.
+- **`image.serial` is the release version.** `template-options` reads it via `yq`
+  and fails the build if unset — same discipline as `appimages`' VERSION guard.
 
 ## `.upstream/`
 

@@ -1,0 +1,11 @@
+# Host toolchain. CT templates are built by distrobuilder (installed in CI via
+# snap — it ships no prebuilt binary), so the host needs only light tooling: yq
+# parses each image's distrobuilder definition to derive the release tag from
+# image.serial. jdx/mise-action provisions the same set in CI.
+min_version = "2026.7.11"
+
+[tools]
+yq = "4.53.3" # latest at pin time; bump with `mise up --bump`
+
+[hooks]
+enter = ["mise install"]

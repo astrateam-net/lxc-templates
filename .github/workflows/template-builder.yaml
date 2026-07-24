@@ -1,0 +1,85 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Template Builder
+
+# Reusable worker: builds one template's Proxmox CT gold image with distrobuilder
+# (build-lxc -> rootfs.tar.zst), and (when release=true) publishes it as a GitHub
+# Release asset tagged <template>-<version>. Called by release.yaml (main) and
+# pull-request.yaml (PR, release=false).
+on:
+  workflow_call:
+    inputs:
+      template:
+        description: Template name (directory under images/)
+        type: string
+        required: true
+      release:
+        description: Publish a GitHub Release
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  build:
+    name: Build ${{ inputs.template }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # Pinned host toolchain (yq) — used by template-options to read the definition.
+      - name: Setup mise
+        uses: jdx/mise-action@f10502fc09dadecfefb962fff68ce77213930204 # v4.2.2
+
+      - name: Template Options
+        id: options
+        uses: ./.github/actions/template-options
+        with:
+          template: ${{ inputs.template }}
+
+      # distrobuilder ships no prebuilt binary and no official action; the snap is
+      # its own documented package channel. debootstrap is the host backend for
+      # Debian/Ubuntu bases (Alpine and others use their own downloader).
+      - name: Install distrobuilder
+        run: |
+          sudo snap install distrobuilder --classic
+          sudo apt-get update
+          sudo apt-get install -y debootstrap
+
+      # build-lxc emits rootfs + meta tarballs and needs root. If a hosted runner
+      # ever rejects the overlay backend, add --disable-overlay to this command.
+      - name: Build CT template
+        env:
+          DEF: images/${{ inputs.template }}/${{ inputs.template }}.yaml
+          OUT: ${{ github.workspace }}/dist/${{ inputs.template }}
+        run: |
+          mkdir -p "$OUT"
+          sudo "$(command -v distrobuilder)" build-lxc "$DEF" "$OUT" --compression zstd
+          sudo chown -R "$USER" dist
+          ls -l "$OUT"
+
+      # The rootfs IS the Proxmox CT template — rename both tarballs to purpose-built
+      # asset names so the Release lists <template>-<version> rather than rootfs.tar.zst.
+      - name: Package assets
+        env:
+          OUT: dist/${{ inputs.template }}
+          ASSET: ${{ inputs.template }}-${{ steps.options.outputs.version }}
+        run: |
+          mv "$OUT/rootfs.tar.zst" "dist/${ASSET}.tar.zst"
+          mv "$OUT/meta.tar.zst"   "dist/${ASSET}.meta.tar.zst"
+          ls -l dist
+
+      - name: Release
+        if: ${{ inputs.release }}
+        uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
+        with:
+          tag: ${{ inputs.template }}-${{ steps.options.outputs.version }}
+          name: ${{ inputs.template }} ${{ steps.options.outputs.version }}
+          artifacts: dist/*.tar.zst
+          allowUpdates: true
+          makeLatest: true
+          body: |
+            Proxmox CT template (LXC gold image) — `${{ steps.options.outputs.distribution }} ${{ steps.options.outputs.release }}`.
+
+            - **CT template:** `${{ inputs.template }}-${{ steps.options.outputs.version }}.tar.zst` — drop into Proxmox template storage (`local:vztmpl`) and `pct create` from it.
+            - `*.meta.tar.zst` is LXC image metadata (not needed by Proxmox).

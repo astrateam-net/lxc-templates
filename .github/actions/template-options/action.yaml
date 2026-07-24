@@ -1,0 +1,46 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-action.json
+name: Template Options
+description: Return the version and base metadata from a template's distrobuilder definition
+
+inputs:
+  template:
+    description: Template name (directory under images/)
+    required: true
+
+outputs:
+  version:
+    description: Gold-image revision (image.serial)
+    value: ${{ steps.options.outputs.version }}
+  distribution:
+    description: Base distribution (image.distribution)
+    value: ${{ steps.options.outputs.distribution }}
+  release:
+    description: Base release (image.release)
+    value: ${{ steps.options.outputs.release }}
+  name:
+    description: Image name (image.name)
+    value: ${{ steps.options.outputs.name }}
+
+runs:
+  using: composite
+  steps:
+    - name: Template Options
+      id: options
+      shell: bash
+      env:
+        DEF: images/${{ inputs.template }}/${{ inputs.template }}.yaml
+      run: |
+        # image.serial is our gold-image revision — every template must set it,
+        # so a missing serial (yq prints "null") fails the build loudly here.
+        VERSION=$(yq '.image.serial' "$DEF")
+        DISTRIBUTION=$(yq '.image.distribution' "$DEF")
+        RELEASE=$(yq '.image.release' "$DEF")
+        NAME=$(yq '.image.name' "$DEF")
+        test -n "$VERSION" && test "$VERSION" != "null"
+        {
+          echo "version=${VERSION}"
+          echo "distribution=${DISTRIBUTION}"
+          echo "release=${RELEASE}"
+          echo "name=${NAME}"
+        } >> "$GITHUB_OUTPUT"

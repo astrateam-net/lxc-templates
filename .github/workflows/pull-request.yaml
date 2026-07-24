@@ -1,0 +1,62 @@
+---
+# yaml-language-server: $schema=https://json.schemastore.org/github-workflow.json
+name: Pull Request
+
+# Build changed templates on PRs for validation only — no release.
+on:
+  pull_request:
+    paths: ["images/**"]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: Prepare
+    runs-on: ubuntu-latest
+    outputs:
+      changed-files: ${{ steps.changed-files.outputs.changed_files }}
+    steps:
+      - name: Get Changed Files
+        id: changed-files
+        uses: bjw-s-labs/action-changed-files@a9a36fb08ce06db9b02fbd8026cc2c0945eb9841 # v0.6.0
+        with:
+          path: images
+          include_only_directories: true
+          max_depth: 1
+
+  changed:
+    if: ${{ needs.prepare.outputs.changed-files != '[]' }}
+    needs: ["prepare"]
+    name: Get Changed Templates
+    runs-on: ubuntu-latest
+    outputs:
+      templates: ${{ steps.templates.outputs.templates }}
+    steps:
+      - name: Get Templates
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        id: templates
+        env:
+          TEMPLATES: ${{ join(fromJSON(needs.prepare.outputs.changed-files), ' ') }}
+        with:
+          script: |
+            const { TEMPLATES } = process.env;
+            const toBuild = TEMPLATES.split(' ').filter(Boolean);
+            core.setOutput('templates', JSON.stringify(toBuild));
+            core.summary.addHeading('Templates to build:').addList(toBuild).write();
+
+  build:
+    if: ${{ needs.changed.outputs.templates != '[]' }}
+    needs: ["changed"]
+    name: Build
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        template: ${{ fromJSON(needs.changed.outputs.templates) }}
+    uses: ./.github/workflows/template-builder.yaml
+    with:
+      template: ${{ matrix.template }}
+      release: false
