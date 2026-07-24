@@ -16,11 +16,14 @@ source:
   same_as: sid # trixie debootstrap script may be absent on the runner; sid's works
   url: https://deb.debian.org/debian/
   keyserver: keyserver.ubuntu.com
+  # Debian 13 (trixie) keyring. Trixie is now stable, so its InRelease is signed
+  # by the Stable Release Key — debootstrap fails without it (unknown key
+  # 762F67A0B2C39DE4). Keep all three so both the source signature and later apt
+  # operations validate.
   keys:
-    - 0x126C0D24BD8A2942CC7DF8AC7638D0442B90D010
-    - 0xA1BD8E9D78F7FE5C3E65D8AF8B48AD6246925553
-    - 0x6D33866EDD8FFA41C0143AEDDCC9EFBF77E11517
-    - 0x80D15823B7FD1561F9F7BCDDDC30D7C23CBBABEE
+    - 0x41587F7DB8C774BCCF131416762F67A0B2C39DE4 # Debian Stable Release Key (13/trixie)
+    - 0x04B54C3CDCA79751B16BC6B5225629DF75B188BD # Debian Archive Automatic Signing Key (13/trixie)
+    - 0x5E04A1E3223A19A20706E20F9904613D4CCE68C6 # Debian Security Archive Automatic Signing Key (13/trixie)
 
 targets:
   lxc:
