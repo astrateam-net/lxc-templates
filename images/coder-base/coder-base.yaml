@@ -62,6 +62,8 @@ files:
     content: |-
       [tools]
       node = "24"
+      gh = "2.96.0"
+      glab = "1.109.0"
   - path: /etc/profile.d/mise.sh
     generator: dump
     mode: "0755"
