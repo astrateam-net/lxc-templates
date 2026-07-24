@@ -46,27 +46,26 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y debootstrap
 
-      # build-lxc emits rootfs + meta tarballs and needs root. If a hosted runner
-      # ever rejects the overlay backend, add --disable-overlay to this command.
+      # `mise run build` renders the definition (gomplate) and streams it to
+      # distrobuilder build-lxc, which needs root. If a hosted runner ever rejects
+      # the overlay backend, add --disable-overlay in .mise/tasks/build.sh.
       - name: Build CT template
-        env:
-          DEF: images/${{ inputs.template }}/${{ inputs.template }}.yaml
-          OUT: ${{ github.workspace }}/dist/${{ inputs.template }}
         run: |
-          mkdir -p "$OUT"
-          sudo "$(command -v distrobuilder)" build-lxc "$DEF" "$OUT" --compression zstd
+          mise run build ${{ inputs.template }}
           sudo chown -R "$USER" dist
-          ls -l "$OUT"
+          ls -l dist/${{ inputs.template }}
 
       # The rootfs IS the Proxmox CT template — rename both tarballs to purpose-built
       # asset names so the Release lists <template>-<version> rather than rootfs.tar.zst.
+      # NOTE: --compression zstd only applies to the rootfs; distrobuilder always
+      # emits metadata as meta.tar.xz, so keep the .xz extension for that asset.
       - name: Package assets
         env:
           OUT: dist/${{ inputs.template }}
           ASSET: ${{ inputs.template }}-${{ steps.options.outputs.version }}
         run: |
           mv "$OUT/rootfs.tar.zst" "dist/${ASSET}.tar.zst"
-          mv "$OUT/meta.tar.zst"   "dist/${ASSET}.meta.tar.zst"
+          mv "$OUT/meta.tar.xz"    "dist/${ASSET}.meta.tar.xz"
           ls -l dist
 
       - name: Release
@@ -74,12 +73,16 @@ jobs:
         uses: ncipollo/release-action@339a81892b84b4eeb0f6e744e4574d79d0d9b8dd # v1.21.0
         with:
           tag: ${{ inputs.template }}-${{ steps.options.outputs.version }}
-          name: ${{ inputs.template }} ${{ steps.options.outputs.version }}
-          artifacts: dist/*.tar.zst
-          allowUpdates: true
-          makeLatest: true
+          name: ${{ inputs.template }} ${{ steps.options.outputs.version }} (${{ steps.options.outputs.distribution }} ${{ steps.options.outputs.release }})
+          artifacts: |
+            dist/*.tar.zst
+            dist/*.meta.tar.xz
+          # immutable per serial: fails if <template>-<serial> already exists (bump image.serial to release)
+          allowUpdates: false
+          # per-template releases are independent artifacts — don't fight over the repo "latest" pointer
+          makeLatest: false
           body: |
             Proxmox CT template (LXC gold image) — `${{ steps.options.outputs.distribution }} ${{ steps.options.outputs.release }}`.
 
             - **CT template:** `${{ inputs.template }}-${{ steps.options.outputs.version }}.tar.zst` — drop into Proxmox template storage (`local:vztmpl`) and `pct create` from it.
-            - `*.meta.tar.zst` is LXC image metadata (not needed by Proxmox).
+            - `*.meta.tar.xz` is LXC image metadata (not needed by Proxmox).

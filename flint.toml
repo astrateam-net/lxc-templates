@@ -1,0 +1,5 @@
+[settings]
+# Reference clones and build output are not ours to lint. Generated definitions
+# are validated by `mise run render-check`, not by the yaml linter (the templates
+# are *.tpl and carry gomplate/distrobuilder directives, not plain YAML).
+exclude = [".upstream/**", "dist/**"]

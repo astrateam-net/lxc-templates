@@ -2,66 +2,66 @@
 
 Proxmox **CT template** (LXC gold-image) factory. Sibling to
 [`containers`](https://github.com/astrateam-net/containers) (Docker images) and
-[`appimages`](https://github.com/astrateam-net/appimages) (`.AppImage`s): a
-declarative-definition-in, built-artifact-out factory.
+[`appimages`](https://github.com/astrateam-net/appimages) (`.AppImage`s).
 
-Each template under `images/` builds a pristine upstream base + our core package
-set into a Proxmox LXC rootfs (`rootfs.tar.zst` + `pct` config), published as a
-release asset. The artifact is a **gold CT template** you drop into Proxmox
-template storage and clone from.
+Each template builds a pristine upstream base + our packages into a Proxmox LXC
+rootfs (`rootfs.tar.zst`), published as a GitHub Release asset — a **gold CT
+template** you drop into Proxmox template storage and clone workspaces from.
 
 ## Why
 
-Proxmox has no cloud-init for LXC. A Coder workspace backed by a Proxmox LXC can
+Proxmox has no cloud-init for LXC. A Coder workspace on a Proxmox LXC can
 otherwise only be shaped at runtime by the `coder_agent` startup script — slow,
-re-run on every rebuild, and fragile. Baking core packages into the CT template
-moves that work from per-workspace runtime to build-time: workspaces boot ready,
-and the agent startup shrinks to workspace-specific glue.
+re-run every rebuild. Baking packages into the CT template moves that to
+build-time: workspaces boot ready.
 
-## Build (planned)
+## Generation contract
 
-Templates are built with [`distrobuilder`](https://github.com/lxc/distrobuilder)
-from a YAML definition per image. Proxmox CT templates are **LXC-format** (the
-same rootfs tarballs `pveam` ships), so we use `build-lxc` — not `build-incus`
-(that's Incus/LXD squashfs format):
+Definitions are **generated, not hand-written**. Each image is a gomplate
+template plus validatable blocks; `mise run render` assembles them into the
+committed definition distrobuilder builds:
+
+```text
+images/<name>/
+  manifest.yaml.tpl   source template (gomplate, [[ ]] delimiters)
+  scripts/*.sh        post-* action blocks (shellcheck)
+  files/*             dropped-in config
+  <name>.yaml         GENERATED, committed (distrobuilder definition)
+```
+
+Blocks inline at render time, so each lints on its own. Edit the template and
+blocks — never `<name>.yaml`; CI fails if it drifts from a fresh render.
+
+## Commands
 
 ```bash
-# one template -> rootfs.tar.zst + meta.tar.zst
-distrobuilder build-lxc images/<name>/<name>.yaml dist/<name>/ --compression zstd
-# dist/<name>/rootfs.tar.zst is the Proxmox CT template:
-#   scp -> /var/lib/vz/template/cache/  (or any CT template storage)
-#   pct create <vmid> local:vztmpl/<name>.tar.zst ...
+mise run render <name>   # blocks -> images/<name>/<name>.yaml
+mise run build  <name>   # render + distrobuilder build-lxc (Linux, root)
+mise run check           # flint (shell/yaml/md/toml) + render-check
 ```
 
-A definition YAML has: `image` (distro/release/arch), `source` (downloader —
-`debootstrap`, `alpine-http`, …), `targets.lxc.config`, `files` (generators:
-`hostname`, `hosts`, `dump`, `remove`, …), `packages` (our core set here) and
-`actions` (bootstrap glue by trigger: `post-unpack` → `post-packages`). Full
-reference: `.upstream/distrobuilder/doc/reference/`.
-
-## Layout
-
-```
-images/<name>/<name>.yaml   distrobuilder definition (base image, packages, files, actions)
-dist/                       built rootfs tarballs (gitignored)
-.github/                    CI: detect changed templates -> build -> release per template
-```
-
-The per-image dir is named after the template (`images/<name>/<name>.yaml`), the
-same way `appimages` keys off `apps/<app>/`. Structure fills in as the first real
-template lands — no empty scaffolding.
+Output `dist/<name>/rootfs.tar.zst` is the Proxmox CT template: `scp` it to
+`/var/lib/vz/template/cache/`, then `pct create`.
 
 ## CI
 
-Thin `release.yaml` / `pull-request.yaml` orchestrators detect changed templates
-(dirs under `images/`) and fan out to the reusable `template-builder.yaml`, which
-installs `distrobuilder` (snap), runs `build-lxc`, and — on `main` only —
-publishes the CT template as a GitHub Release tagged `<name>-<version>`. Mirrors
-the `appimages` CI shape; the build engine is distrobuilder, not `docker bake`.
+`pull-request.yaml` lints every PR and builds changed templates (no release).
+`release.yaml` (on `main`) publishes each changed template as a GitHub Release
+`<name>-<serial>`. Runs via `jdx/mise-action`; distrobuilder installed by snap.
+
+## Toolchain (mise)
+
+`gomplate` (render), `flint` + `shellcheck`/`ryl`/`rumdl`/`taplo` (lint), `hk`
+(git hooks). `mise install` provisions all of it and installs the hooks.
 
 ## Conventions
 
-- **`image.serial` is the gold-image version.** Every definition must set it (a
-  semver like `1.0.0` or a date like `2026.07.24`); it becomes the release tag
-  and the CT template's serial. CI fails loudly if it's missing.
-- Pin to explicit upstream base versions; don't float on `latest`.
+- **`image.serial` = `<base-major>.<minor>.<patch>`** — major = base distro
+  release (Debian 13 → `13`); bump minor/patch for changes on the same base,
+  major on a rebase. Becomes the release tag `<name>-<serial>`.
+- Pin explicit upstream base versions; don't float on `latest`.
+
+## `.upstream/`
+
+Gitignored reference clones (distrobuilder, lxc-ci) — study upstream here; never
+a build input.
