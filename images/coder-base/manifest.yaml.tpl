@@ -8,7 +8,7 @@ image:
   name: coder-base-debian-trixie-amd64
   description: |-
     Coder LXC workspace base ({{ image.distribution }} {{ image.release }})
-  serial: "13.0.1" # base-major.minor.patch — major = base distro (13 = Debian 13)
+  serial: "13.0.2" # base-major.minor.patch — major = base distro (13 = Debian 13)
   expiry: 30d
 
 source:
@@ -64,6 +64,10 @@ files:
     mode: "0755"
     content: |-
 [[ file.Read "files/etc-profile.d-mise.sh" | strings.TrimSpace | strings.Indent 6 ]]
+  - path: /etc/systemd/system/coder-agent.service
+    generator: dump
+    content: |-
+[[ file.Read "files/etc-systemd-system-coder-agent.service" | strings.TrimSpace | strings.Indent 6 ]]
 
 packages:
   manager: apt
@@ -149,6 +153,9 @@ actions:
   - trigger: post-files
     action: |-
 [[ file.Read "scripts/30-mise-node.sh" | strings.TrimSpace | strings.Indent 6 ]]
+  - trigger: post-files
+    action: |-
+[[ file.Read "scripts/40-coder-agent.sh" | strings.TrimSpace | strings.Indent 6 ]]
 
 mappings:
   architecture_map: debian
