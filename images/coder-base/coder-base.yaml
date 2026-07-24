@@ -10,7 +10,7 @@ image:
   name: coder-base-debian-trixie-amd64
   description: |-
     Coder LXC workspace base ({{ image.distribution }} {{ image.release }})
-  serial: "13.0.1" # base-major.minor.patch — major = base distro (13 = Debian 13)
+  serial: "13.0.2" # base-major.minor.patch — major = base distro (13 = Debian 13)
   expiry: 30d
 
 source:
@@ -72,6 +72,23 @@ files:
       if [ -n "${PS1:-}" ] && command -v mise >/dev/null 2>&1; then
         eval "$(mise activate bash)"
       fi
+  - path: /etc/systemd/system/coder-agent.service
+    generator: dump
+    content: |-
+      [Unit]
+      Description=Coder Agent
+      After=network-online.target
+      Wants=network-online.target
+
+      [Service]
+      User=coder
+      EnvironmentFile=/opt/coder/init.env
+      ExecStart=/opt/coder/init
+      Restart=always
+      RestartSec=10
+
+      [Install]
+      WantedBy=multi-user.target
 
 packages:
   manager: apt
@@ -184,6 +201,17 @@ actions:
       # `mise install` auto-reshims, so the shims exist before we symlink them.
       mise install
       ln -sf /usr/local/share/mise/shims/* /usr/local/bin/
+  - trigger: post-files
+    action: |-
+      #!/bin/sh
+      set -eux
+
+      # The injector only lands /opt/coder/init + init.env (per-workspace); the dir and
+      # the enabled unit are baked here.
+      install -d -m 0755 /opt/coder
+      install -d /etc/systemd/system/multi-user.target.wants
+      ln -sf /etc/systemd/system/coder-agent.service \
+        /etc/systemd/system/multi-user.target.wants/coder-agent.service
 
 mappings:
   architecture_map: debian
