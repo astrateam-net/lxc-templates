@@ -1,0 +1,15 @@
+# Gitignored reference clones — study upstreams here, never a build input.
+.upstream/
+
+# Built artifacts — CT template rootfs tarballs and distrobuilder output
+/dist/
+*.tar.zst
+*.tar.xz
+*.tar.gz
+rootfs.squashfs
+
+# distrobuilder scratch
+/.build/
+
+# OS / editor
+.DS_Store
