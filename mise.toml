@@ -1,11 +1,40 @@
-# Host toolchain. CT templates are built by distrobuilder (installed in CI via
-# snap — it ships no prebuilt binary), so the host needs only light tooling: yq
-# parses each image's distrobuilder definition to derive the release tag from
-# image.serial. jdx/mise-action provisions the same set in CI.
+# Host toolchain + repo contract for the CT-template factory.
+#
+# Images are GENERATED, not hand-written: each images/<img>/manifest.yaml.tpl is a
+# gomplate template that inlines validatable blocks (scripts/*.sh, files/*) into the
+# single distrobuilder definition. `mise run build <img>` renders + builds it.
+# Tasks live under .mise/tasks/ (file tasks); trivial aggregators stay here.
 min_version = "2026.7.11"
 
+[settings]
+experimental = true # file-task discovery under .mise/tasks/
+lockfile = true
+jobs = 4
+
+[env]
+HK_MISE = 1 # run hk hooks via `mise x` so pinned tools resolve without shell activation
+
 [tools]
-yq = "4.53.3" # latest at pin time; bump with `mise up --bump`
+# ── image generation ──────────────────────────────────────────────────────────
+gomplate = "5.2.0" # assemble manifest.yaml.tpl -> distrobuilder definition ([[ ]] delims)
+hk = "1.51.0"      # git-lifecycle gate (hk.pkl)
+yq = "4.53.3"      # validate the assembled definition; read image.serial in CI
+
+# Linters
+"aqua:grafana/flint" = "0.22.9"  # multi-linter runner (shell/yaml/md/toml)
+"aqua:owenlamont/ryl" = "0.21.0" # yaml
+rumdl = "0.2.35"                 # markdown
+shellcheck = "latest"            # .mise/tasks/*.sh + images/*/scripts/*.sh + files/*.sh
+taplo = "0.10.0"                 # toml
 
 [hooks]
 enter = ["mise install"]
+postinstall = ["hk install --mise"]
+
+[tasks.lint]
+description = "Lint shell + yaml + md + toml via flint"
+run = "flint run --full shellcheck ryl rumdl taplo"
+
+[tasks.check]
+description = "All quality gates — lint + assemble every image definition"
+depends = ["lint", "render-check"]

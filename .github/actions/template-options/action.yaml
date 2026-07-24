@@ -31,8 +31,9 @@ runs:
       env:
         DEF: images/${{ inputs.template }}/${{ inputs.template }}.yaml
       run: |
-        # image.serial is our gold-image revision — every template must set it,
-        # so a missing serial (yq prints "null") fails the build loudly here.
+        # Read release metadata from the committed, rendered definition (the drift check
+        # keeps it in sync with source). image.serial is our gold-image revision — every
+        # template must set it, so a missing serial (yq prints "null") fails loudly here.
         VERSION=$(yq '.image.serial' "$DEF")
         DISTRIBUTION=$(yq '.image.distribution' "$DEF")
         RELEASE=$(yq '.image.release' "$DEF")

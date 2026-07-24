@@ -41,27 +41,28 @@ reference: `.upstream/distrobuilder/doc/reference/`.
 
 ## Layout
 
-```
+```text
 images/<name>/<name>.yaml   distrobuilder definition (base image, packages, files, actions)
 dist/                       built rootfs tarballs (gitignored)
 .github/                    CI: detect changed templates -> build -> release per template
 ```
 
 The per-image dir is named after the template (`images/<name>/<name>.yaml`), the
-same way `appimages` keys off `apps/<app>/`. Structure fills in as the first real
-template lands — no empty scaffolding.
+same way `appimages` keys off `apps/<app>/`. Structure fills in as the first
+real template lands — no empty scaffolding.
 
 ## CI
 
 Thin `release.yaml` / `pull-request.yaml` orchestrators detect changed templates
-(dirs under `images/`) and fan out to the reusable `template-builder.yaml`, which
-installs `distrobuilder` (snap), runs `build-lxc`, and — on `main` only —
+(dirs under `images/`) and fan out to the reusable `template-builder.yaml`,
+which installs `distrobuilder` (snap), runs `build-lxc`, and — on `main` only —
 publishes the CT template as a GitHub Release tagged `<name>-<version>`. Mirrors
 the `appimages` CI shape; the build engine is distrobuilder, not `docker bake`.
 
 ## Conventions
 
-- **`image.serial` is the gold-image version.** Every definition must set it (a
-  semver like `1.0.0` or a date like `2026.07.24`); it becomes the release tag
-  and the CT template's serial. CI fails loudly if it's missing.
+- **`image.serial` = `<base-major>.<minor>.<patch>`** — major = base distro
+  release (Debian 13 → `13`); bump minor/patch for gold-image changes on the
+  same base, major on a rebase. Becomes the release tag `<template>-<serial>`.
+  CI fails if unset.
 - Pin to explicit upstream base versions; don't float on `latest`.
