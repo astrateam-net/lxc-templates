@@ -8,7 +8,7 @@ image:
   name: coder-base-debian-trixie-amd64
   description: |-
     Coder LXC workspace base ({{ image.distribution }} {{ image.release }})
-  serial: "13.0.0" # base-major.minor.patch — major = base distro (13 = Debian 13)
+  serial: "13.0.1" # base-major.minor.patch — major = base distro (13 = Debian 13)
   expiry: 30d
 
 source:
