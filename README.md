@@ -21,13 +21,23 @@ and the agent startup shrinks to workspace-specific glue.
 ## Build (planned)
 
 Templates are built with [`distrobuilder`](https://github.com/lxc/distrobuilder)
-from a YAML definition per image:
+from a YAML definition per image. Proxmox CT templates are **LXC-format** (the
+same rootfs tarballs `pveam` ships), so we use `build-lxc` — not `build-incus`
+(that's Incus/LXD squashfs format):
 
 ```bash
-# one template
-distrobuilder build-incus images/<name>/<name>.yaml --type=split   # -> rootfs + metadata
-# package into a Proxmox CT template tarball -> dist/<name>.tar.zst
+# one template -> rootfs.tar.zst + meta.tar.zst
+distrobuilder build-lxc images/<name>/<name>.yaml dist/<name>/ --compression zstd
+# dist/<name>/rootfs.tar.zst is the Proxmox CT template:
+#   scp -> /var/lib/vz/template/cache/  (or any CT template storage)
+#   pct create <vmid> local:vztmpl/<name>.tar.zst ...
 ```
+
+A definition YAML has: `image` (distro/release/arch), `source` (downloader —
+`debootstrap`, `alpine-http`, …), `targets.lxc.config`, `files` (generators:
+`hostname`, `hosts`, `dump`, `remove`, …), `packages` (our core set here) and
+`actions` (bootstrap glue by trigger: `post-unpack` → `post-packages`). Full
+reference: `.upstream/distrobuilder/doc/reference/`.
 
 ## Layout (planned)
 
