@@ -10,7 +10,7 @@ image:
   name: coder-base-debian-trixie-amd64
   description: |-
     Coder LXC workspace base ({{ image.distribution }} {{ image.release }})
-  serial: "13.0.2" # base-major.minor.patch — major = base distro (13 = Debian 13)
+  serial: "13.0.3" # base-major.minor.patch — major = base distro (13 = Debian 13)
   expiry: 30d
 
 source:
@@ -181,6 +181,19 @@ actions:
       id coder >/dev/null 2>&1 || useradd --create-home -s /bin/bash -u 1000 -G sudo coder
       printf 'coder ALL=(ALL) NOPASSWD:ALL\n' > /etc/sudoers.d/coder
       chmod 0440 /etc/sudoers.d/coder
+  - trigger: post-packages
+    action: |-
+      #!/bin/sh
+      set -eux
+
+      # Bare debootstrap leaves systemd-networkd-wait-online.service enabled by preset,
+      # but this image uses ifupdown (networking.service owns eth0); systemd-networkd
+      # itself stays disabled. An enabled wait-online with no running networkd blocks
+      # network-online.target for its full 120s timeout on every boot, which delays
+      # coder-agent.service (After=network-online.target) by ~2 minutes. ifupdown's own
+      # ifupdown-wait-online.service already satisfies the target in ~1s. The stock
+      # debian-13-standard Proxmox template masks this unit; match that.
+      ln -sf /dev/null /etc/systemd/system/systemd-networkd-wait-online.service
   # post-files: /etc/mise/config.toml is written by then, so `mise install` reads node=24 from it
   - trigger: post-files
     action: |-

@@ -8,7 +8,7 @@ image:
   name: coder-base-debian-trixie-amd64
   description: |-
     Coder LXC workspace base ({{ image.distribution }} {{ image.release }})
-  serial: "13.0.2" # base-major.minor.patch — major = base distro (13 = Debian 13)
+  serial: "13.0.3" # base-major.minor.patch — major = base distro (13 = Debian 13)
   expiry: 30d
 
 source:
@@ -149,6 +149,9 @@ actions:
   - trigger: post-packages
     action: |-
 [[ file.Read "scripts/20-user-locale.sh" | strings.TrimSpace | strings.Indent 6 ]]
+  - trigger: post-packages
+    action: |-
+[[ file.Read "scripts/25-mask-networkd-wait-online.sh" | strings.TrimSpace | strings.Indent 6 ]]
   # post-files: /etc/mise/config.toml is written by then, so `mise install` reads node=24 from it
   - trigger: post-files
     action: |-
