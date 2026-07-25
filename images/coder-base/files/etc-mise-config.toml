@@ -2,3 +2,6 @@
 node = "24"
 gh = "2.96.0"
 glab = "1.109.0"
+# Not in the mise registry — github backend reads the goreleaser assets directly and
+# verifies the release's GitHub artifact attestations, which upstream's curl|sh does not.
+"github:Infisical/agent-vault" = "0.39.0"
