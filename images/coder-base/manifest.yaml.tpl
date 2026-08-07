@@ -8,7 +8,7 @@ image:
   name: coder-base-debian-trixie-amd64
   description: |-
     Coder LXC workspace base ({{ image.distribution }} {{ image.release }})
-  serial: "13.0.4" # base-major.minor.patch — major = base distro (13 = Debian 13)
+  serial: "13.0.5" # base-major.minor.patch — major = base distro (13 = Debian 13)
   expiry: 30d
 
 source:
@@ -117,10 +117,12 @@ packages:
         - systemd-sysv
         - dbus
       action: install
-    # iptables for egress rules; uidmap for newuidmap/newgidmap (userns id mapping).
+    # iptables for egress rules; uidmap for newuidmap/newgidmap (userns id mapping);
+    # bubblewrap for unprivileged sandboxes (agent tooling shells out to bwrap).
     - packages:
         - iptables
         - uidmap
+        - bubblewrap
       action: install
     # t64 names required on Debian 13 (libgtk/libasound/libatk-bridge/libatspi).
     - packages:
